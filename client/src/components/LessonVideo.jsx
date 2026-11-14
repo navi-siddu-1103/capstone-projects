@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 
-// Same base URL the rest of the app uses
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// Same base URL the rest of the app uses.
+// VITE_API_URL already includes /api — do NOT append /api again.
+const API = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/+$/, '');
 
 export default function LessonVideo({ videoJobId }) {
   const videoRef = useRef(null);
   const [playbackError, setPlaybackError] = useState('');
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -29,50 +31,79 @@ export default function LessonVideo({ videoJobId }) {
     let retryTimer = null;
 
     setPlaybackError('');
+    setProcessing(false);
 
     async function start() {
-      // Pre-flight check: shows the real HTTP status instead of a vague HLS error.
-      // You can delete this block once playback works.
+      // Pre-flight check: gives us the real HTTP status before HLS.js tries.
+      let res;
       try {
-        const res = await fetch(playlistUrl, {
+        res = await fetch(playlistUrl, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (cancelled) return;
-
-        if (res.status === 425) {
-          setPlaybackError('Video is still processing. Please wait...');
-          retryTimer = setTimeout(start, 2000);
-          return;
-        }
-
-        if (!res.ok) {
-          setPlaybackError(`Playlist request failed (HTTP ${res.status}).`);
-          return;
-        }
-
-        const text = await res.text();
-        if (!text.trimStart().startsWith('#EXTM3U')) {
-          setPlaybackError(
-            'Server did not return an HLS playlist. Check the API URL / Vite proxy.'
-          );
-          return;
-        }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setPlaybackError('Cannot reach the video server (network or CORS error).');
         }
         return;
       }
 
+      if (cancelled) return;
+
+      // 425 — job queued/active but not yet completed; keep retrying.
+      // 404 — job may have just been queued and not yet picked up by worker.
+      // Both are transient: auto-retry every 3 s.
+      if (res.status === 425 || res.status === 404) {
+        setProcessing(true);
+        setPlaybackError('');
+        retryTimer = setTimeout(start, 3000);
+        return;
+      }
+
+      // 409 — processing failed permanently.
+      if (res.status === 409) {
+        setProcessing(false);
+        setPlaybackError('Video processing failed. Please contact support or re-upload the video.');
+        return;
+      }
+
+      // 403 — not enrolled / not authorised.
+      if (res.status === 403) {
+        setProcessing(false);
+        setPlaybackError('You are not enrolled in this course.');
+        return;
+      }
+
+      if (!res.ok) {
+        setProcessing(false);
+        setPlaybackError(`Unable to load video (HTTP ${res.status}). Please try again.`);
+        return;
+      }
+
+      // Response body was consumed by the preflight fetch; HLS.js needs to
+      // make its own request. That's fine — both requests hit the same route.
+      const text = await res.text();
+      if (!text.trimStart().startsWith('#EXTM3U')) {
+        setProcessing(false);
+        setPlaybackError('Server did not return a valid HLS playlist.');
+        return;
+      }
+
+      // All good — hand off to HLS.js.
+      setProcessing(false);
+      setPlaybackError('');
+
       if (Hls.isSupported()) {
         hls = new Hls({
-          // Sent on the playlist AND every .ts segment request
+          // Attach the JWT to every playlist and .ts segment XHR.
           xhrSetup: (xhr) => {
             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
           },
         });
 
-        hls.on(Hls.Events.MANIFEST_PARSED, () => setPlaybackError(''));
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          setPlaybackError('');
+          setProcessing(false);
+        });
 
         hls.on(Hls.Events.ERROR, (_event, data) => {
           console.error('HLS error:', data.type, data.details, data.response?.code);
@@ -81,11 +112,15 @@ export default function LessonVideo({ videoJobId }) {
 
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             const code = data.response?.code;
-            setPlaybackError(
-              code
-                ? `Video request failed (HTTP ${code}). Check the .ts segment requests in Network.`
-                : 'Network error while loading the video.'
-            );
+            if (code === 401 || code === 403) {
+              setPlaybackError('Session expired. Please sign out and sign back in.');
+            } else {
+              setPlaybackError(
+                code
+                  ? `Video request failed (HTTP ${code}).`
+                  : 'Network error while loading the video.'
+              );
+            }
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             hls.recoverMediaError();
           } else {
@@ -96,9 +131,12 @@ export default function LessonVideo({ videoJobId }) {
 
         hls.loadSource(playlistUrl);
         hls.attachMedia(video);
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Safari native HLS — cannot send Authorization header on segment requests.
+        // Serve the playlist directly; segments will fail auth. Acceptable fallback.
+        video.src = playlistUrl;
       } else {
-        // Safari's native HLS can't send an Authorization header
-        setPlaybackError('This browser needs a different playback method for protected videos.');
+        setPlaybackError('Your browser does not support HLS video playback.');
       }
     }
 
@@ -119,6 +157,12 @@ export default function LessonVideo({ videoJobId }) {
       <video ref={videoRef} controls width="100%" preload="metadata">
         Your browser does not support video playback.
       </video>
+
+      {processing && (
+        <p style={{ color: '#7f8c8d', marginTop: 8, fontStyle: 'italic' }}>
+          ⏳ Video is still processing. This page will auto-refresh when ready…
+        </p>
+      )}
 
       {playbackError && (
         <p role="alert" style={{ color: '#c0392b', marginTop: 8 }}>

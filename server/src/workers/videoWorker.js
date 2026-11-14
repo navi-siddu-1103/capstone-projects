@@ -1,5 +1,6 @@
 
 import 'dotenv/config';
+import { createServer } from 'node:http';
 
 import { Worker } from 'bullmq';
 import {
@@ -161,4 +162,17 @@ worker.on('error', (err) => {
 
 worker.on('active', (job) => {
   console.log(`Processing video job ${job.id}`);
+});
+
+// ---------------------------------------------------------------------------
+// Minimal HTTP health server — required for Cloud Run Service health checks.
+// The actual work is driven by BullMQ / Redis, not HTTP.
+// ---------------------------------------------------------------------------
+const healthPort = Number(process.env.PORT || 8081);
+createServer((req, res) => {
+  const alive = !worker.closing;
+  res.writeHead(alive ? 200 : 503, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ status: alive ? 'worker-alive' : 'worker-closing' }));
+}).listen(healthPort, () => {
+  console.log(`Worker health endpoint listening on port ${healthPort}`);
 });

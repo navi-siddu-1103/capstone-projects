@@ -1,14 +1,13 @@
 import { Router } from 'express';
 import path from 'node:path';
-import fs from 'node:fs';
 import { Queue } from 'bullmq';
 import { requireAuth } from '../middleware/auth.js';
 import { Course, Enrollment } from '../models.js';
-import { playlistPath, processedDir } from '../videoStorage.js';
 import { redisConnection } from '../redis.js';
 import {
   S3Client,
   GetObjectCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 
 const router = Router();
@@ -50,6 +49,24 @@ async function canAccessVideo(req, jobId) {
   );
 }
 
+/**
+ * Check whether the processed HLS playlist exists in S3.
+ * This is the source of truth — Redis job records get auto-deleted
+ * after `removeOnComplete` threshold but S3 objects persist.
+ */
+async function playlistExistsInS3(jobId) {
+  try {
+    await s3.send(
+      new HeadObjectCommand({
+        Bucket: bucket,
+        Key: `processed/${jobId}/index.m3u8`,
+      })
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // Serve an HLS playlist only to authorized users.
 router.get('/:jobId/playlist', requireAuth, async (req, res) => {
@@ -66,10 +83,17 @@ router.get('/:jobId/playlist', requireAuth, async (req, res) => {
       });
     }
 
-    const job = await videoQueue.getJob(jobId);
-    const state = job ? await job.getState() : null;
+    // --- Primary check: does the processed playlist already exist in S3? ---
+    // We check S3 first because BullMQ auto-removes completed jobs from Redis
+    // (removeOnComplete threshold), so the job record may be gone even when
+    // the video was successfully processed.
+    const readyInS3 = await playlistExistsInS3(jobId);
 
-    if (state !== 'completed') {
+    if (!readyInS3) {
+      // S3 file not found — check Redis for job state to give a better message.
+      const job = await videoQueue.getJob(jobId);
+      const state = job ? await job.getState() : null;
+
       if (state === 'failed') {
         return res.status(409).json({
           message: 'Video processing failed',
@@ -77,6 +101,7 @@ router.get('/:jobId/playlist', requireAuth, async (req, res) => {
       }
 
       if (state && state !== 'completed') {
+        // Job is waiting / active / delayed — still processing.
         res.setHeader('Retry-After', '2');
         return res.status(425).json({
           message: 'Video is still being processed',
@@ -84,11 +109,14 @@ router.get('/:jobId/playlist', requireAuth, async (req, res) => {
         });
       }
 
+      // No job in Redis and no file in S3 — video was never processed or
+      // the job ID is wrong.
       return res.status(404).json({
-        message: 'Video processing job not found',
+        message: 'Video not found. It may still be queued — please wait a moment and refresh.',
       });
     }
 
+    // --- S3 file exists: stream the playlist ---
     let playlist;
 
     try {

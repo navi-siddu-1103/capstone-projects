@@ -23,10 +23,16 @@ import { processedDir } from './videoStorage.js';
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' } });
+
+// Support comma-separated origins e.g. CLIENT_ORIGIN=https://app.vercel.app,http://localhost:5173
+const rawOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+const allowedOrigins = rawOrigin.split(',').map((o) => o.trim()).filter(Boolean);
+const corsOrigin = allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins;
+
+const io = new Server(server, { cors: { origin: corsOrigin, credentials: true } });
 app.set('io', io);
 let databaseReady = false;
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 app.use('/processed', express.static(processedDir));
 app.use('/api', rateLimit({ windowMs: 60_000, limit: 120 }));

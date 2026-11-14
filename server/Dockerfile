@@ -9,6 +9,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-COPY . .
+COPY src ./src
+
+ENV NODE_ENV=production
 
 CMD ["npm", "run", "worker"]

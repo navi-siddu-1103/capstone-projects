@@ -132,13 +132,11 @@ router.post(
         keyId: process.env.RAZORPAY_KEY_ID,
       });
     } catch (error) {
-      console.error(
-        'Create Razorpay order failed:',
-        error.error?.description || error.message
-      );
+            const desc = error.error?.description || error.message || 'Unable to create payment order.';
+      console.error('Create Razorpay order failed:', desc);
 
       return res.status(500).json({
-        message: 'Unable to create payment order. Please try again.',
+        message: `Payment gateway error: ${desc}`,
       });
     }
   }

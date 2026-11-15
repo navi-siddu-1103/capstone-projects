@@ -186,6 +186,7 @@ export default function App() {
   const [notice, setNotice] = useState('');
 
   const [loading, setLoading] = useState(false);
+  const [actionCourseId, setActionCourseId] = useState(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState(null);
 
@@ -388,9 +389,10 @@ export default function App() {
   async function submitAuth(event) {
     event.preventDefault();
 
-    if (loading) return;
+    if (actionCourseId) return;
 
-    setLoading(true);
+
+    setActionCourseId(courseId);
     setNotice('');
 
     try {
@@ -605,7 +607,15 @@ export default function App() {
       return;
     }
 
+    if (actionCourseId) return;
+
+
+    setActionCourseId(courseId);
+
+
     try {
+
+
       await request(`/courses/${courseId}/enroll`, {
         method: 'POST',
         body: JSON.stringify({}),
@@ -628,6 +638,8 @@ export default function App() {
       console.error('Enrollment failed:', error);
       setNotice(error.message || 'Failed to enroll in course.');
       flash(`Enrollment failed: ${error.message}`);
+    } finally {
+      setActionCourseId(null);
     }
   }
 
@@ -682,9 +694,9 @@ export default function App() {
       return;
     }
 
-    if (loading) return;
+    if (actionCourseId) return;
 
-    setLoading(true);
+    setActionCourseId(courseId);
 
     try {
       // Load the Razorpay Checkout script if it isn't loaded already.
@@ -787,7 +799,7 @@ export default function App() {
       console.error('Course purchase failed:', error);
       flash(`Unable to start payment: ${error.message}`);
     } finally {
-      setLoading(false);
+      setActionCourseId(null);
     }
   }
 
@@ -1811,7 +1823,7 @@ export default function App() {
               <button
                 className="btn btn-primary full"
                 type="submit"
-                disabled={loading}
+                disabled={Boolean(actionCourseId)}
               >
                 {loading
                   ? 'Please wait...'
@@ -2124,13 +2136,13 @@ export default function App() {
                             enroll(course);
                           }
                         }}
-                        disabled={loading}
+                        disabled={Boolean(actionCourseId)}
                       >
                         {user?.role === 'instructor' || user?.role === 'admin' ? (
                           <>
                             View Course <ArrowRight size={15} />
                           </>
-                        ) : loading ? (
+                        ) : actionCourseId === (course._id || course.id) ? (
                           'Please wait...'
                         ) : Number(course.price || 0) > 0 ? (
                           <>

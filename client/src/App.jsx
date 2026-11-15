@@ -184,6 +184,7 @@ export default function App() {
   const [studentQuizAttempts, setStudentQuizAttempts] = useState([]);
   const [studentQuizLoading, setStudentQuizLoading] = useState(false);
   const [studentDashboardTab, setStudentDashboardTab] = useState('all');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [query, setQuery] = useState('');
 
@@ -314,6 +315,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    setSidebarOpen(false);
     if (page === 'My Learning' && user?.role === 'student') {
       setPage('Dashboard');
     }
@@ -1501,18 +1503,37 @@ export default function App() {
   // RENDER APPLICATION
   return (
     <div className="app-shell">
+      {/* SIDEBAR BACKDROP FOR MOBILE */}
+      {sidebarOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* SIDEBAR */}
+      <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="sidebar-brand-row">
+          <div className="brand">
+            <span className="brand-icon">
+              <GraduationCap size={23} />
+            </span>
 
-      <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-icon">
-            <GraduationCap size={23} />
-          </span>
+            <span>
+              learn<span className="brand-accent">live</span>
+              <small>LEARNING PLATFORM</small>
+            </span>
+          </div>
 
-          <span>
-            learn<span className="brand-accent">live</span>
-            <small>LEARNING PLATFORM</small>
-          </span>
+          <button
+            type="button"
+            className="sidebar-close-btn"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close navigation menu"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         <div className="workspace-label">WORKSPACE</div>
@@ -1523,7 +1544,17 @@ export default function App() {
           return (
             <button
               key={item.name}
-              onClick={() => { if (!user && item.name !== 'Explore') { setLoginPortal(item.name === 'Dashboard' ? 'instructor' : 'student'); setPage('Welcome'); } else setPage(item.name); }}
+              onClick={() => {
+                setSidebarOpen(false);
+                if (!user && item.name !== 'Explore') {
+                  setLoginPortal(
+                    item.name === 'Dashboard' ? 'instructor' : 'student'
+                  );
+                  setPage('Welcome');
+                } else {
+                  setPage(item.name);
+                }
+              }}
               className={`nav-item ${
                 page === item.name ? 'active' : ''
               }`}
@@ -1546,7 +1577,12 @@ export default function App() {
             <b>Keep growing</b>
             <p>Small lessons. Big progress.</p>
 
-            <button onClick={() => setPage('Explore')}>
+            <button
+              onClick={() => {
+                setSidebarOpen(false);
+                setPage('Explore');
+              }}
+            >
               Explore courses <ArrowRight size={14} />
             </button>
           </div>
@@ -1556,12 +1592,19 @@ export default function App() {
       {/* MAIN CONTENT */}
       <main className="main-content">
         <header className="topbar">
-          <button className="mobile-menu" aria-label="Open menu">
-            <Menu size={20} />
+          <button
+            type="button"
+            className="mobile-menu"
+            onClick={() => setSidebarOpen((prev) => !prev)}
+            aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
+            aria-expanded={sidebarOpen}
+          >
+            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
           <div className="breadcrumb">
-            Workspace <span>/</span> <b>{page}</b>
+            <span className="breadcrumb-root">Workspace</span>{' '}
+            <span className="breadcrumb-slash">/</span> <b>{page}</b>
           </div>
 
           <div className="topbar-right">

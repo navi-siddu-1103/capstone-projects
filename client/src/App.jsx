@@ -1582,23 +1582,47 @@ export default function App() {
                     aria-label="Notifications"
                   >
                     <div className="notification-header">
-                      <h3>Notifications</h3>
+                      <div className="notification-title-group">
+                        <h3>Notifications</h3>
+                        {unreadCount > 0 && (
+                          <span className="notif-pill">{unreadCount} new</span>
+                        )}
+                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setNotificationsOpen(false)}
-                        aria-label="Close notifications"
-                      >
-                        ×
-                      </button>
+                      <div className="notification-header-actions">
+                        {unreadCount > 0 && (
+                          <button
+                            type="button"
+                            className="notif-header-btn"
+                            onClick={markAllNotificationsRead}
+                            title="Mark all as read"
+                          >
+                            <CheckCheck size={14} />
+                            Mark all read
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          className="notif-close-btn"
+                          onClick={() => setNotificationsOpen(false)}
+                          aria-label="Close notifications"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
                     </div>
 
                     {notificationsLoading ? (
-                      <p className="notification-empty">Loading notifications...</p>
+                      <div className="notification-empty">
+                        <p>Loading notifications...</p>
+                      </div>
                     ) : notifications.length === 0 ? (
-                      <p className="notification-empty">
-                        No notifications yet.
-                      </p>
+                      <div className="notification-empty">
+                        <Bell size={28} style={{ opacity: 0.35, marginBottom: 8 }} />
+                        <p>No notifications yet.</p>
+                        <small>We'll notify you when live classes start or updates occur.</small>
+                      </div>
                     ) : (
                       <div className="notification-list">
                         {notifications.map((notification) => (
@@ -1608,67 +1632,68 @@ export default function App() {
                               notification.isRead ? 'read' : 'unread'
                             }`}
                           >
-                            <div className="notification-content">
-                              <strong>
+                            <div className="notification-card-header">
+                              <span className="notification-title">
                                 {notification.title || 'Notification'}
-                              </strong>
-
-                              <p>
-                                {notification.message ||
-                                  notification.content ||
-                                  'You have a new notification.'}
-                              </p>
-
-                              {notification.type === 'live-class' && notification.link && (
-                                <div style={{ marginTop: 8, marginBottom: 6 }}>
-                                  <button
-                                    type="button"
-                                    className="btn btn-primary btn-sm"
-                                    style={{
-                                      padding: '6px 14px',
-                                      fontSize: 13,
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 6,
-                                    }}
-                                    onClick={() => {
-                                      markNotificationRead(notification._id);
-                                      joinLiveClass(notification.link);
-                                    }}
-                                  >
-                                    <Video size={14} />
-                                    Join Live Class ({notification.link})
-                                  </button>
-                                </div>
-                              )}
+                              </span>
 
                               {notification.createdAt && (
-                                <small>
+                                <span className="notification-time">
                                   {new Date(
                                     notification.createdAt
-                                  ).toLocaleString()}
-                                </small>
+                                  ).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
                               )}
                             </div>
+
+                            <p className="notification-body">
+                              {notification.message ||
+                                notification.content ||
+                                'You have a new notification.'}
+                            </p>
+
+                            {notification.type === 'live-class' && notification.link && (
+                              <div className="notification-live-card">
+                                <span className="live-pulse-dot" />
+                                <span className="live-code-text">
+                                  Room: <code>{notification.link}</code>
+                                </span>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary notif-join-btn"
+                                  onClick={() => {
+                                    markNotificationRead(notification._id);
+                                    joinLiveClass(notification.link);
+                                  }}
+                                >
+                                  <Video size={13} />
+                                  Join Now
+                                </button>
+                              </div>
+                            )}
 
                             <div className="notification-actions">
                               {!notification.isRead && (
                                 <button
                                   type="button"
+                                  className="notif-action-btn read-btn"
                                   onClick={() =>
-                                    markNotificationAsRead(notification._id)
+                                    markNotificationRead(notification._id)
                                   }
                                 >
+                                  <CheckCheck size={14} />
                                   Mark as read
                                 </button>
                               )}
 
                               <button
                                 type="button"
+                                className="notif-action-btn delete-btn"
                                 onClick={() =>
                                   deleteNotification(notification._id)
                                 }
                               >
+                                <Trash2 size={14} />
                                 Delete
                               </button>
                             </div>

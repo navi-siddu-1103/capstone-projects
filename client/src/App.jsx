@@ -282,6 +282,10 @@ export default function App() {
   const [liveToken, setLiveToken] = useState('');
   const [liveServerUrl, setLiveServerUrl] = useState('');
   const [liveConnecting, setLiveConnecting] = useState(false);
+  const [hostCourseId, setHostCourseId] = useState('');
+  const [hostRoomName, setHostRoomName] = useState('');
+  const [hostTopic, setHostTopic] = useState('');
+  const [hostBroadcasting, setHostBroadcasting] = useState(false);
 
   // NOTIFICATIONS
   const flash = useCallback((message) => {
@@ -367,8 +371,12 @@ export default function App() {
       });
   }, []);
 
-  const joinLiveClass = async () => {
-    if (!liveRoomName.trim()) {
+  const joinLiveClass = async (roomOverride) => {
+    const targetRoom = (
+      typeof roomOverride === 'string' ? roomOverride : liveRoomName
+    ).trim();
+
+    if (!targetRoom) {
       flash('Please enter a meeting code.');
       return;
     }
@@ -378,16 +386,54 @@ export default function App() {
       const data = await request('/live-classes/token', {
         method: 'POST',
         body: JSON.stringify({
-          roomName: liveRoomName.trim(),
+          roomName: targetRoom,
         }),
       });
 
+      setLiveRoomName(targetRoom);
       setLiveToken(data.token);
       setLiveServerUrl(data.serverUrl);
+      setPage('Live Classes');
+      setNotificationsOpen(false);
     } catch (error) {
       flash(error.message || 'Unable to join the live class.');
     } finally {
       setLiveConnecting(false);
+    }
+  };
+
+  const broadcastAndStartLiveClass = async () => {
+    if (!hostCourseId) {
+      flash('Please select a course for the live class.');
+      return;
+    }
+    const trimmedRoom = hostRoomName.trim();
+    if (!trimmedRoom) {
+      flash('Please enter or generate a meeting code.');
+      return;
+    }
+
+    setHostBroadcasting(true);
+    try {
+      const data = await request('/live-classes/broadcast', {
+        method: 'POST',
+        body: JSON.stringify({
+          courseId: hostCourseId,
+          roomName: trimmedRoom,
+          topic: hostTopic.trim(),
+        }),
+      });
+
+      flash(
+        `Live session started! Sent invitation code to ${data.notifiedCount || 0} enrolled student(s).`
+      );
+
+      // Connect instructor directly as host
+      await joinLiveClass(trimmedRoom);
+    } catch (error) {
+      flash(`Unable to broadcast live class: ${error.message}`);
+    } finally {
+      setHostBroadcasting(false);
     }
   };
 
@@ -1572,6 +1618,29 @@ export default function App() {
                                   notification.content ||
                                   'You have a new notification.'}
                               </p>
+
+                              {notification.type === 'live-class' && notification.link && (
+                                <div style={{ marginTop: 8, marginBottom: 6 }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary btn-sm"
+                                    style={{
+                                      padding: '6px 14px',
+                                      fontSize: 13,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 6,
+                                    }}
+                                    onClick={() => {
+                                      markNotificationRead(notification._id);
+                                      joinLiveClass(notification.link);
+                                    }}
+                                  >
+                                    <Video size={14} />
+                                    Join Live Class ({notification.link})
+                                  </button>
+                                </div>
+                              )}
 
                               {notification.createdAt && (
                                 <small>
@@ -3034,7 +3103,7 @@ export default function App() {
                     type="text"
                     value={quizTitle}
                     onChange={(e) => setQuizTitle(e.target.value)}
-                    placeholder="e.g. Java Fundamentals Quiz"
+                    placeholder="Enter quiz title"
                   />
                 </label>
 
@@ -3464,6 +3533,119 @@ export default function App() {
               <>
                 <p>Join your instructor and classmates for live video and audio sessions.</p>
 
+                {(user?.role === 'instructor' || user?.role === 'admin') && (
+                  <div className="feature-panel instructor-live-panel" style={{ marginBottom: 24, border: '1px solid #c9cef9', background: '#fafbff' }}>
+                    <div className="feature-icon" style={{ background: '#e0e7ff', color: '#4338ca' }}>
+                      <Video size={25} />
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span className="eyebrow" style={{ fontSize: 11, color: '#4f46e5', fontWeight: 800, letterSpacing: 1.5, display: 'block', marginBottom: 4 }}>
+                        INSTRUCTOR STUDIO
+                      </span>
+                      <h3 style={{ margin: '0 0 6px', fontSize: 18, color: '#1e293b' }}>
+                        Host a Live Class & Notify Students
+                      </h3>
+                      <p style={{ margin: '0 0 16px', fontSize: 13, color: '#64748b' }}>
+                        Start a live session for your course. All enrolled students will automatically receive a notification with the room code to join.
+                      </p>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginBottom: 14 }}>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#334155' }}>
+                          Select course
+                          <select
+                            className="quiz-input"
+                            style={{ height: 46, borderRadius: 8, padding: '0 12px', border: '1px solid #cbd5e1', background: '#fff' }}
+                            value={hostCourseId}
+                            onChange={(e) => {
+                              const courseId = e.target.value;
+                              setHostCourseId(courseId);
+                              const selected = courses.find((c) => String(c._id) === String(courseId));
+                              if (selected) {
+                                const cleanSlug = selected.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 16).replace(/^-|-$/g, '');
+                                setHostRoomName(`${cleanSlug}-${Math.floor(1000 + Math.random() * 9000)}`);
+                              }
+                            }}
+                          >
+                            <option value="">Select a course to host</option>
+                            {courses
+                              .filter((course) => {
+                                if (String(course._id).startsWith('demo')) return false;
+                                if (user?.role === 'admin') return true;
+                                if (user?.role === 'instructor') {
+                                  const instructorId =
+                                    course.instructor?._id ||
+                                    course.instructor?.id ||
+                                    course.instructor;
+                                  const matchesId =
+                                    instructorId &&
+                                    String(instructorId) === String(user._id || user.id);
+                                  const matchesName =
+                                    course.instructor?.name &&
+                                    user?.name &&
+                                    course.instructor.name === user.name;
+                                  return Boolean(matchesId || matchesName);
+                                }
+                                return false;
+                              })
+                              .map((course) => (
+                                <option key={course._id} value={course._id}>
+                                  {course.title}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#334155' }}>
+                          Meeting code (Room ID)
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <input
+                              type="text"
+                              style={{ flex: 1, minWidth: 0, height: 46, borderRadius: 8, padding: '0 12px', border: '1px solid #cbd5e1', maxWidth: '100%', background: '#fff' }}
+                              placeholder="e.g. data-science-101"
+                              value={hostRoomName}
+                              onChange={(e) => setHostRoomName(e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ padding: '0 14px', whiteSpace: 'nowrap', height: 46, borderRadius: 8 }}
+                              onClick={() => {
+                                const randomCode = `room-${Math.floor(100000 + Math.random() * 900000)}`;
+                                setHostRoomName(randomCode);
+                              }}
+                            >
+                              New Code
+                            </button>
+                          </div>
+                        </label>
+                      </div>
+
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 16 }}>
+                        Topic / Session note (Optional)
+                        <input
+                          type="text"
+                          style={{ width: '100%', maxWidth: '100%', height: 46, borderRadius: 8, padding: '0 12px', border: '1px solid #cbd5e1', background: '#fff' }}
+                          placeholder="e.g. Doubt clearing and Q&A session"
+                          value={hostTopic}
+                          onChange={(e) => setHostTopic(e.target.value)}
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 46, padding: '0 24px', borderRadius: 8 }}
+                        onClick={broadcastAndStartLiveClass}
+                        disabled={hostBroadcasting || !hostCourseId || !hostRoomName.trim()}
+                      >
+                        <Video size={18} />
+                        {hostBroadcasting ? 'Broadcasting & Connecting...' : 'Start Class & Notify Students'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="feature-panel">
                   <div className="feature-icon">
                     <Video size={25} />
@@ -3483,7 +3665,7 @@ export default function App() {
 
                     <button
                       className="btn btn-primary"
-                      onClick={joinLiveClass}
+                      onClick={() => joinLiveClass()}
                       disabled={liveConnecting}
                     >
                       {liveConnecting ? 'Connecting...' : 'Join Class'}
@@ -4296,6 +4478,17 @@ export default function App() {
                     >
                       <BookOpen size={16} />
                       Manage Course Lessons
+                      <ArrowRight size={16} />
+                    </button>
+
+                    {/* Host Live Class */}
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setPage('Live Classes')}
+                    >
+                      <Video size={16} />
+                      Host Live Class
                       <ArrowRight size={16} />
                     </button>
                 </div>

@@ -190,6 +190,65 @@ router.get(
   }
 );
 
+// List quiz attempts and completion results for the logged-in student.
+// This route must appear before GET /:quizId.
+router.get(
+  '/my-attempts',
+  requireAuth,
+  allowRoles('student'),
+  async (req, res) => {
+    try {
+      const attempts = await Attempt.find({
+        student: req.user.id,
+      })
+        .populate({
+          path: 'quiz',
+          select: 'title course questions',
+          populate: {
+            path: 'course',
+            select: 'title category instructor',
+            populate: {
+              path: 'instructor',
+              select: 'name',
+            },
+          },
+        })
+        .sort({ submittedAt: -1 });
+
+      const results = attempts
+        .filter((attempt) => attempt.quiz)
+        .map((attempt) => {
+          const total =
+            attempt.total ||
+            (attempt.quiz.questions ? attempt.quiz.questions.length : 0);
+          const score = attempt.score || 0;
+          const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
+
+          return {
+            _id: attempt._id,
+            quizId: attempt.quiz._id,
+            quizTitle: attempt.quiz.title,
+            courseId: attempt.quiz.course?._id,
+            courseTitle: attempt.quiz.course?.title || 'Unknown course',
+            courseCategory: attempt.quiz.course?.category || 'General',
+            instructorName:
+              attempt.quiz.course?.instructor?.name || 'Instructor',
+            score,
+            total,
+            percentage,
+            passed: percentage >= 70,
+            submittedAt: attempt.submittedAt,
+          };
+        });
+
+      return res.json({ attempts: results });
+    } catch (error) {
+      console.error('List student quiz attempts error:', error);
+      return res.status(500).json({ message: 'Failed to load quiz attempts' });
+    }
+  }
+);
+
 // List quizzes for a course. Correct answers are never returned.
 router.get('/course/:courseId', requireAuth, async (req, res) => {
   try {

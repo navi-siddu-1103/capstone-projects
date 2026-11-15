@@ -19,6 +19,8 @@ import {
   CheckCheck,
   Trash2,
   X,
+  Clock,
+  RefreshCw,
 } from 'lucide-react';
 
 
@@ -179,6 +181,9 @@ export default function App() {
   
   const [myCourses, setMyCourses] = useState([]);
   const [myCoursesLoading, setMyCoursesLoading] = useState(false);
+  const [studentQuizAttempts, setStudentQuizAttempts] = useState([]);
+  const [studentQuizLoading, setStudentQuizLoading] = useState(false);
+  const [studentDashboardTab, setStudentDashboardTab] = useState('all');
 
   const [query, setQuery] = useState('');
 
@@ -309,6 +314,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (page === 'My Learning' && user?.role === 'student') {
+      setPage('Dashboard');
+    }
+    if (page === 'Dashboard' && user?.role === 'student') {
+      loadMyLearning();
+      loadStudentQuizAttempts();
+    }
     if (
       page === 'Manage Course Lessons' &&
       (user?.role === 'instructor' || user?.role === 'admin')
@@ -803,7 +815,7 @@ export default function App() {
             flash(`Payment successful! You are enrolled in ${course.title}.`);
 
             await loadMyLearning();
-            setPage('My Learning');
+            setPage('Dashboard');
           } catch (error) {
             console.error('Payment verification failed:', error);
             flash(
@@ -989,6 +1001,19 @@ export default function App() {
     }
   }
 
+  async function loadStudentQuizAttempts() {
+    if (!user || user.role !== 'student') return;
+    setStudentQuizLoading(true);
+    try {
+      const data = await request('/quizzes/my-attempts');
+      setStudentQuizAttempts(data.attempts || []);
+    } catch (error) {
+      console.error('Unable to load quiz attempts:', error);
+    } finally {
+      setStudentQuizLoading(false);
+    }
+  }
+
   async function loadQuizzes(courseId) {
     setQuizzesLoading(true);
     setQuizzes([]);
@@ -1066,7 +1091,6 @@ export default function App() {
     { name: 'Explore', icon: Search },
     ...(user?.role === 'student'
       ? [
-          { name: 'My Learning', icon: BookOpen },
           { name: 'Certificates', icon: Award },
         ]
       : []),
@@ -1078,6 +1102,26 @@ export default function App() {
       ? [{ name: 'Admin Management', icon: ShieldCheck }]
       : []),
   ];
+
+  const completedCourses = myCourses.filter((course) => course.progress === 100);
+  const inProgressCourses = myCourses.filter((course) => course.progress < 100);
+  const totalAttemptsCount = studentQuizAttempts.length;
+  const passedQuizzesCount = studentQuizAttempts.filter((a) => a.passed).length;
+  const averageQuizScore = totalAttemptsCount > 0
+    ? Math.round(
+        studentQuizAttempts.reduce(
+          (acc, a) => acc + (Number(a.percentage) || 0),
+          0
+        ) / totalAttemptsCount
+      )
+    : null;
+
+  const displayedStudentCourses =
+    studentDashboardTab === 'in-progress'
+      ? inProgressCourses
+      : studentDashboardTab === 'completed'
+      ? completedCourses
+      : myCourses;
 
   // LOADING SCREEN
   if (showSplash) {
@@ -2387,11 +2431,11 @@ export default function App() {
                 setSelectedQuiz(null);
                 setQuizResult(null);
                 setPage(
-                  user?.role === 'student' ? 'My Learning' : 'Explore'
+                  user?.role === 'student' ? 'Dashboard' : 'Explore'
                 );
               }}
             >
-              ← Back to {user?.role === 'student' ? 'My Learning' : 'Explore'}
+              ← Back to {user?.role === 'student' ? 'Dashboard' : 'Explore'}
             </button>
 
             <h1>{selectedCourse.title}</h1>
@@ -2573,6 +2617,7 @@ export default function App() {
 
                           setQuizResult(result);
                           flash('Quiz submitted successfully!');
+                          loadStudentQuizAttempts();
                         } catch (error) {
                           flash(`Quiz submission failed: ${error.message}`);
                         } finally {
@@ -3754,9 +3799,9 @@ export default function App() {
                   <p>Complete all lessons in a course to earn your certificate.</p>
                   <button
                     className="btn btn-primary"
-                    onClick={() => setPage('My Learning')}
+                    onClick={() => setPage('Dashboard')}
                   >
-                    View My Learning
+                    Go to Dashboard
                   </button>
                 </div>
               </div>
@@ -4438,7 +4483,13 @@ export default function App() {
         {/* DASHBOARD */}
 
         {page === 'Dashboard' && (
-          <section className="generic-page instructor-dashboard">
+          <section
+            className={`generic-page ${
+              user?.role === 'student'
+                ? 'student-dashboard'
+                : 'instructor-dashboard'
+            }`}
+          >
             <span className="eyebrow">YOUR WORKSPACE</span>
 
             <h1>
@@ -4735,15 +4786,524 @@ export default function App() {
                 )}
               </div>
               </>
+            ) : !user ? (
+              <div className="student-empty-state">
+                <div className="student-empty-icon">
+                  <LogIn size={36} />
+                </div>
+                <h3>Sign in to view your dashboard</h3>
+                <p>Track your enrolled courses, lesson progress, and quiz results.</p>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setPage('Sign in')}
+                >
+                  Sign in
+                  <ArrowRight size={16} />
+                </button>
+              </div>
             ) : (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setPage(user ? 'My Learning' : 'Sign in')}
-              >
-                {user ? 'View my learning' : 'Sign in'}
-                <ArrowRight size={16} />
-              </button>
+              <div className="student-dashboard-content">
+                {/* METRICS OVERVIEW */}
+                <div className="student-metrics-grid">
+                  <article className="student-metric-card">
+                    <div className="metric-icon-wrap blue">
+                      <BookOpen size={20} />
+                    </div>
+                    <div className="metric-info">
+                      <span className="student-metric-label">Enrolled Courses</span>
+                      <strong>{myCourses.length}</strong>
+                      <span className="metric-subtext">Courses in your library</span>
+                    </div>
+                  </article>
+
+                  <article className="student-metric-card">
+                    <div className="metric-icon-wrap green">
+                      <CheckCircle2 size={20} />
+                    </div>
+                    <div className="metric-info">
+                      <span className="student-metric-label">Courses Completed</span>
+                      <strong>{completedCourses.length}</strong>
+                      <span className="metric-subtext">100% lessons finished</span>
+                    </div>
+                  </article>
+
+                  <article className="student-metric-card">
+                    <div className="metric-icon-wrap amber">
+                      <Clock size={20} />
+                    </div>
+                    <div className="metric-info">
+                      <span className="student-metric-label">In Progress</span>
+                      <strong>{inProgressCourses.length}</strong>
+                      <span className="metric-subtext">Active learning underway</span>
+                    </div>
+                  </article>
+
+                  <article className="student-metric-card">
+                    <div className="metric-icon-wrap purple">
+                      <ClipboardList size={20} />
+                    </div>
+                    <div className="metric-info">
+                      <span className="student-metric-label">Quizzes Completed</span>
+                      <strong>{studentQuizAttempts.length}</strong>
+                      <span className="metric-subtext">
+                        {averageQuizScore !== null
+                          ? `${averageQuizScore}% average score`
+                          : 'No attempts yet'}
+                      </span>
+                    </div>
+                  </article>
+
+                  <article className="student-metric-card">
+                    <div className="metric-icon-wrap gold">
+                      <Award size={20} />
+                    </div>
+                    <div className="metric-info">
+                      <span className="student-metric-label">Certificates Earned</span>
+                      <strong>{completedCourses.length}</strong>
+                      <span className="metric-subtext">Verified certificates</span>
+                    </div>
+                  </article>
+                </div>
+
+                {/* TABS & ACTIONS */}
+                <div className="student-dash-nav">
+                  <div className="student-dash-tabs">
+                    <button
+                      type="button"
+                      className={`student-dash-tab ${
+                        studentDashboardTab === 'all' ? 'active' : ''
+                      }`}
+                      onClick={() => setStudentDashboardTab('all')}
+                    >
+                      <BookOpen size={15} />
+                      All Courses
+                      <span className="tab-count">{myCourses.length}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`student-dash-tab ${
+                        studentDashboardTab === 'in-progress' ? 'active' : ''
+                      }`}
+                      onClick={() => setStudentDashboardTab('in-progress')}
+                    >
+                      <Clock size={15} />
+                      In Progress
+                      <span className="tab-count">{inProgressCourses.length}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`student-dash-tab ${
+                        studentDashboardTab === 'completed' ? 'active' : ''
+                      }`}
+                      onClick={() => setStudentDashboardTab('completed')}
+                    >
+                      <CheckCircle2 size={15} />
+                      Completed Courses
+                      <span className="tab-count">{completedCourses.length}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`student-dash-tab ${
+                        studentDashboardTab === 'quizzes' ? 'active' : ''
+                      }`}
+                      onClick={() => setStudentDashboardTab('quizzes')}
+                    >
+                      <ClipboardList size={15} />
+                      Quiz Results
+                      <span className="tab-count">
+                        {studentQuizAttempts.length}
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="student-dash-actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        loadMyLearning();
+                        loadStudentQuizAttempts();
+                      }}
+                      disabled={myCoursesLoading || studentQuizLoading}
+                      title="Refresh courses and quiz results"
+                    >
+                      <RefreshCw
+                        size={14}
+                        className={
+                          myCoursesLoading || studentQuizLoading ? 'spin' : ''
+                        }
+                      />
+                      Refresh
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => setPage('Explore')}
+                    >
+                      <Search size={14} />
+                      Explore Courses
+                    </button>
+                  </div>
+                </div>
+
+                {/* MY LEARNING / ENROLLED COURSES VIEW */}
+                {studentDashboardTab !== 'quizzes' && (
+                  <div className="student-courses-section">
+                    <div className="student-section-heading">
+                      <div>
+                        <span className="eyebrow">MY LEARNING</span>
+                        <h2>
+                          {studentDashboardTab === 'completed'
+                            ? 'Completed Courses'
+                            : studentDashboardTab === 'in-progress'
+                            ? 'In-Progress Courses'
+                            : 'Enrolled Courses'}
+                        </h2>
+                        <p>
+                          {studentDashboardTab === 'completed'
+                            ? 'Courses you have 100% completed. Download your verified certificate anytime.'
+                            : studentDashboardTab === 'in-progress'
+                            ? 'Continue learning lessons where you left off.'
+                            : 'All courses you are currently enrolled in with live progress.'}
+                        </p>
+                      </div>
+
+                      {myCoursesLoading && (
+                        <span className="student-loading-pill">
+                          Updating courses...
+                        </span>
+                      )}
+                    </div>
+
+                    {!myCoursesLoading && displayedStudentCourses.length === 0 ? (
+                      <div className="student-empty-state">
+                        <div className="student-empty-icon">
+                          {studentDashboardTab === 'completed' ? (
+                            <Award size={36} />
+                          ) : (
+                            <BookOpen size={36} />
+                          )}
+                        </div>
+                        <h3>
+                          {studentDashboardTab === 'completed'
+                            ? 'No completed courses yet'
+                            : studentDashboardTab === 'in-progress'
+                            ? 'No courses currently in progress'
+                            : 'Your learning journey starts here'}
+                        </h3>
+                        <p>
+                          {studentDashboardTab === 'completed'
+                            ? 'Finish all lessons in an enrolled course to view it here and download your certificate.'
+                            : studentDashboardTab === 'in-progress'
+                            ? 'You have completed all your enrolled courses, or have not enrolled yet.'
+                            : "You haven't enrolled in any courses yet. Explore our catalog and start learning!"}
+                        </p>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => setPage('Explore')}
+                        >
+                          Explore Courses <ArrowRight size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="my-learning-grid">
+                        {displayedStudentCourses.map((course) => {
+                          const lessons = course.lessons || [];
+                          const completedLessons = course.completedLessons || [];
+                          const totalLessons = lessons.length;
+                          const completedCount = completedLessons.length;
+                          const progress = totalLessons
+                            ? Math.min(
+                                100,
+                                Math.round((completedCount / totalLessons) * 100)
+                              )
+                            : 0;
+                          const isCompleted = progress === 100;
+
+                          return (
+                            <article className="my-learning-card" key={course._id}>
+                              <div className="my-learning-card-top">
+                                <div
+                                  className={`my-learning-course-icon ${
+                                    isCompleted ? 'completed-icon' : ''
+                                  }`}
+                                >
+                                  {isCompleted ? (
+                                    <Award size={23} />
+                                  ) : (
+                                    <BookOpen size={23} />
+                                  )}
+                                </div>
+                                <span
+                                  className={`my-learning-status ${
+                                    isCompleted
+                                      ? 'status-completed'
+                                      : 'status-progress'
+                                  }`}
+                                >
+                                  {isCompleted ? 'Completed ✓' : 'In Progress'}
+                                </span>
+                              </div>
+
+                              <div className="my-learning-card-content">
+                                <span className="course-card-category">
+                                  {course.category || 'General'}
+                                </span>
+                                <h3>{course.title}</h3>
+                                <p className="my-learning-description">
+                                  {course.description ||
+                                    'Continue learning and building your skills.'}
+                                </p>
+
+                                <div className="my-learning-meta">
+                                  <span>
+                                    Instructor:{' '}
+                                    {course.instructor?.name ||
+                                      'Instructor not available'}
+                                  </span>
+                                  <span>
+                                    {completedCount} of {totalLessons} lessons
+                                    completed
+                                  </span>
+                                </div>
+
+                                <div
+                                  className="my-learning-progress-track"
+                                  role="progressbar"
+                                  aria-valuenow={progress}
+                                  aria-valuemin={0}
+                                  aria-valuemax={100}
+                                  aria-label={`${course.title} completion`}
+                                >
+                                  <div
+                                    className={`my-learning-progress-fill ${
+                                      isCompleted ? 'fill-completed' : ''
+                                    }`}
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
+
+                                <div className="my-learning-progress-label">
+                                  <span>Course progress</span>
+                                  <strong>{progress}%</strong>
+                                </div>
+                              </div>
+
+                              <div className="my-learning-card-footer">
+                                <div className="card-footer-buttons">
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={() => {
+                                      setSelectedCourse(course);
+                                      setPage('Course Details');
+                                    }}
+                                  >
+                                    {isCompleted
+                                      ? 'Review Course'
+                                      : 'Continue Learning'}
+                                    <ArrowRight size={16} />
+                                  </button>
+
+                                  {isCompleted && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary certificate-dash-btn"
+                                      onClick={() => downloadCertificate(course)}
+                                      title="Download Official Certificate (PDF)"
+                                    >
+                                      <Award size={15} />
+                                      Certificate
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* QUIZ COMPLETION & RESULT DATA SECTION */}
+                {(studentDashboardTab === 'quizzes' ||
+                  (studentDashboardTab === 'all' &&
+                    studentQuizAttempts.length > 0)) && (
+                  <div className="student-quiz-section">
+                    <div className="student-section-heading">
+                      <div>
+                        <span className="eyebrow">ASSESSMENT PERFORMANCE</span>
+                        <h2>Quiz Completion & Results</h2>
+                        <p>
+                          Review your submitted quizzes, scores, accuracy, and
+                          completion details.
+                        </p>
+                      </div>
+
+                      {studentQuizAttempts.length > 0 && (
+                        <div className="quiz-summary-badges">
+                          <span className="quiz-badge-item passed">
+                            {passedQuizzesCount} Passed
+                          </span>
+                          <span className="quiz-badge-item total">
+                            {totalAttemptsCount} Attempted
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {studentQuizLoading ? (
+                      <p className="student-dash-message">
+                        Loading quiz results...
+                      </p>
+                    ) : studentQuizAttempts.length === 0 ? (
+                      <div className="student-empty-state">
+                        <div className="student-empty-icon">
+                          <ClipboardList size={36} />
+                        </div>
+                        <h3>No quiz results yet</h3>
+                        <p>
+                          Quizzes are available in your enrolled courses.
+                          Complete assessments to test your knowledge and see
+                          your performance data here.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="student-quiz-grid">
+                        {studentQuizAttempts.map((attempt) => (
+                          <article
+                            className="student-quiz-card"
+                            key={attempt._id}
+                          >
+                            <div className="student-quiz-card-top">
+                              <span className="quiz-course-tag">
+                                {attempt.courseTitle}
+                              </span>
+
+                              <span
+                                className={`quiz-result-pill ${
+                                  attempt.passed ? 'passed' : 'needs-review'
+                                }`}
+                              >
+                                {attempt.passed ? (
+                                  <>
+                                    <CheckCircle2 size={13} />
+                                    Passed ({attempt.percentage}%)
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock size={13} />
+                                    Needs Review ({attempt.percentage}%)
+                                  </>
+                                )}
+                              </span>
+                            </div>
+
+                            <div className="student-quiz-card-body">
+                              <h3>{attempt.quizTitle}</h3>
+                              <p className="quiz-instructor-text">
+                                Instructor: {attempt.instructorName}
+                              </p>
+
+                              <div className="quiz-score-display">
+                                <div className="quiz-score-numbers">
+                                  <span className="score-label">Score</span>
+                                  <strong>
+                                    {attempt.score}{' '}
+                                    <small>/ {attempt.total}</small>
+                                  </strong>
+                                </div>
+
+                                <div className="quiz-score-pct">
+                                  <span>Accuracy</span>
+                                  <strong>{attempt.percentage}%</strong>
+                                </div>
+                              </div>
+
+                              <div className="quiz-score-bar-track">
+                                <div
+                                  className={`quiz-score-bar-fill ${
+                                    attempt.passed
+                                      ? 'fill-passed'
+                                      : 'fill-review'
+                                  }`}
+                                  style={{
+                                    width: `${Math.min(
+                                      100,
+                                      Math.max(0, attempt.percentage)
+                                    )}%`,
+                                  }}
+                                />
+                              </div>
+
+                              {attempt.submittedAt && (
+                                <div className="quiz-submitted-time">
+                                  <Clock size={12} />
+                                  <span>
+                                    Submitted{' '}
+                                    {new Date(
+                                      attempt.submittedAt
+                                    ).toLocaleDateString(undefined, {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: 'numeric',
+                                    })}{' '}
+                                    at{' '}
+                                    {new Date(
+                                      attempt.submittedAt
+                                    ).toLocaleTimeString([], {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="student-quiz-card-footer">
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => {
+                                  const course =
+                                    myCourses.find(
+                                      (c) =>
+                                        String(c._id) ===
+                                        String(attempt.courseId)
+                                    ) ||
+                                    courses.find(
+                                      (c) =>
+                                        String(c._id) ===
+                                        String(attempt.courseId)
+                                    );
+
+                                  if (course) {
+                                    setSelectedCourse(course);
+                                    setPage('Course Details');
+                                    loadQuizzes(course._id);
+                                  } else {
+                                    setPage('Explore');
+                                  }
+                                }}
+                              >
+                                Review in Course
+                                <ArrowRight size={14} />
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </section>
         )}

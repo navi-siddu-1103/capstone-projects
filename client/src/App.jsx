@@ -395,10 +395,9 @@ export default function App() {
   async function submitAuth(event) {
     event.preventDefault();
 
-    if (actionCourseId) return;
+    if (loading) return;
 
-
-    setActionCourseId(courseId);
+    setLoading(true);
     setNotice('');
 
     try {
@@ -447,7 +446,13 @@ export default function App() {
         setUser(data.user);
 
         // Route users to the workspace matching their verified role.
-        setPage(data.user.role === 'student' ? 'Explore' : 'Dashboard');
+        setPage(
+          data.user.role === 'student'
+            ? 'Explore'
+            : data.user.role === 'admin'
+            ? 'Admin Management'
+            : 'Dashboard'
+        );
 
         setAuth((previous) => ({
           ...previous,
@@ -1815,7 +1820,7 @@ export default function App() {
               <button
                 className="btn btn-primary full"
                 type="submit"
-                disabled={Boolean(actionCourseId)}
+                disabled={loading}
               >
                 {loading
                   ? 'Please wait...'

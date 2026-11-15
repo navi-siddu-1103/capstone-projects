@@ -311,6 +311,12 @@ export default function App() {
     ) {
       loadInstructorCourses();
     }
+    if (
+      page === 'Quiz Management' &&
+      (user?.role === 'instructor' || user?.role === 'admin')
+    ) {
+      loadManagedQuizzes();
+    }
   }, [page, user?.role]);
 
   // RESTORE AUTHENTICATION & LOAD COURSES
@@ -2990,11 +2996,43 @@ export default function App() {
                   >
                     <option value="">Select a course</option>
 
-                    {courses.map((course) => (
-                      <option key={course._id} value={course._id}>
-                        {course.title}
-                      </option>
-                    ))}
+                    {courses
+                      .filter((course) => {
+                        // Exclude demo fallback courses
+                        if (String(course._id).startsWith('demo')) return false;
+
+                        // Admin can manage quizzes for any course
+                        if (user?.role === 'admin') return true;
+
+                        // When editing an existing quiz, always retain its assigned course
+                        if (editingQuizId && String(course._id) === String(quizCourseId)) {
+                          return true;
+                        }
+
+                        // Instructors can only select courses they created
+                        if (user?.role === 'instructor') {
+                          const instructorId =
+                            course.instructor?._id ||
+                            course.instructor?.id ||
+                            course.instructor;
+                          const matchesId =
+                            instructorId &&
+                            String(instructorId) === String(user._id || user.id);
+                          const matchesName =
+                            course.instructor?.name &&
+                            user?.name &&
+                            course.instructor.name === user.name;
+
+                          return Boolean(matchesId || matchesName);
+                        }
+
+                        return false;
+                      })
+                      .map((course) => (
+                        <option key={course._id} value={course._id}>
+                          {course.title}
+                        </option>
+                      ))}
                   </select>
                 </label>
 
@@ -3030,24 +3068,6 @@ export default function App() {
                     Add multiple-choice questions and select the correct answer.
                   </p>
                 </div>
-
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() =>
-                    setNewQuizQuestions((previous) => [
-                      ...previous,
-                      {
-                        prompt: '',
-                        options: ['', '', '', ''],
-                        correctOptionIndex: 0,
-                        points: 1,
-                      },
-                    ])
-                  }
-                >
-                  + Add question
-                </button>
               </div>
 
               {/* QUESTION EDITORS */}
@@ -3212,6 +3232,25 @@ export default function App() {
                     </div>
                   </article>
                 ))}
+
+                <button
+                  type="button"
+                  className="quiz-add-question-btn"
+                  onClick={() =>
+                    setNewQuizQuestions((previous) => [
+                      ...previous,
+                      {
+                        prompt: '',
+                        options: ['', '', '', ''],
+                        correctOptionIndex: 0,
+                        points: 1,
+                      },
+                    ])
+                  }
+                >
+                  <PlusCircle size={18} />
+                  Add question
+                </button>
               </div>
 
               {/* FORM FOOTER */}

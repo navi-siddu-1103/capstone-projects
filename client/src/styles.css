@@ -6366,3 +6366,28 @@ button {
     gap: 16px;
   }
 }
+/* Add Question button below question cards */
+.quiz-add-question-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 16px 24px;
+  border: 2px dashed #c9cef9;
+  border-radius: 16px;
+  background: #f8f9ff;
+  color: #5356e8;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 6px;
+}
+
+.quiz-add-question-btn:hover {
+  background: #edf0ff;
+  border-color: #5356e8;
+  color: #3b3dbb;
+  transform: translateY(-1px);
+}

@@ -41,7 +41,7 @@ import LessonVideo from './components/LessonVideo';
 // --------------------------------------------------
 
 const API = (
-  import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+  import.meta.env.VITE_API_URL || 'https://learning-management-system-live-classes-753172578941.asia-south1.run.app/api'
 ).replace(/\/$/, '');
 
 // --------------------------------------------------
@@ -312,75 +312,52 @@ export default function App() {
     }
   }, [page, user?.role]);
 
-  // LOAD COURSES AND RESTORE AUTHENTICATION
+  // RESTORE AUTHENTICATION & LOAD COURSES
   useEffect(() => {
-    let active = true;
-    async function initializeApp() {
-      const token = localStorage.getItem('learnlive_token');
+    const token = localStorage.getItem('learnlive_token');
 
-      // Load courses independently of authentication.
-      try {
-        const data = await request('/courses');
-        const result = normalizeCourses(data);
-
-        if (active && result !== null && result.length > 0) {
-          setCourses(result);
-        }
-      } catch (error) {
-        // Keep demo courses visible when the API fails.
-        console.error('Course loading failed:', error.message);
-
-        if (active) {
-          setNotice(
-            `Showing demo courses. Course API error: ${error.message}`
-          );
-        }
-      }
-      // Do not call /auth/me when there is no token.
-      if (!token) {
-        if (active) {
-          setAuthChecking(false);
-        }
-        return;
-      }
-      try {
-        const data = await request('/auth/me');
-
-        if (!active) return;
-
-        if (data?.user) {
-          setUser(data.user);
-          setPage(
-          data.user.role === 'student'
-          ? 'Explore'
-          : data.user.role === 'admin'
-            ? 'Admin Management'
-            : 'Dashboard'
-          );
-        } else {
+    // 1. Check session if token exists
+    if (!token) {
+      setAuthChecking(false);
+    } else {
+      request('/auth/me')
+        .then((data) => {
+          if (data?.user) {
+            setUser(data.user);
+            setPage(
+              data.user.role === 'student'
+                ? 'Explore'
+                : data.user.role === 'admin'
+                ? 'Admin Management'
+                : 'Dashboard'
+            );
+          } else {
+            localStorage.removeItem('learnlive_token');
+            setUser(null);
+          }
+        })
+        .catch((err) => {
+          console.error('Session restoration failed:', err.message);
           localStorage.removeItem('learnlive_token');
           setUser(null);
-        }
-      } catch (error) {
-        console.error('Session restoration failed:', error.message);
-
-        if (active) {
-          // Clear a token that cannot restore a valid session.
-          localStorage.removeItem('learnlive_token');
-          setUser(null);
-        }
-      } finally {
-        if (active) {
+        })
+        .finally(() => {
           setAuthChecking(false);
-        }
-      }
+        });
     }
 
-    initializeApp();
-
-    return () => {
-      active = false;
-    };
+    // 2. Load courses independently in the background
+    request('/courses')
+      .then((data) => {
+        const result = normalizeCourses(data);
+        if (result !== null && result.length > 0) {
+          setCourses(result);
+        }
+      })
+      .catch((error) => {
+        console.error('Course loading failed:', error.message);
+        setNotice(`Showing demo courses. Course API error: ${error.message}`);
+      });
   }, []);
 
   const joinLiveClass = async () => {

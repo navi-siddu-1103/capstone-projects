@@ -3,7 +3,8 @@ import Hls from 'hls.js';
 
 // Same base URL the rest of the app uses.
 // VITE_API_URL already includes /api — do NOT append /api again.
-const API = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/+$/, '');
+const PROD_API_URL = 'https://learning-management-system-live-classes-753172578941.asia-south1.run.app/api';
+const API = (import.meta.env.VITE_API_URL || PROD_API_URL).replace(/\/+$/, '');
 
 export default function LessonVideo({ videoJobId }) {
   const videoRef = useRef(null);

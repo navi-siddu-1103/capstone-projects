@@ -7,12 +7,13 @@ import { requireAuth } from '../middleware/auth.js';
 const router = Router();
 
 // POST /api/auth/register
-// Public registration always creates a student account.
+// Public registration creates either a student or instructor account.
 router.post('/register', async (req, res) => {
   try {
     const name = String(req.body.name || '').trim();
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
+    const role = req.body.role === 'instructor' ? 'instructor' : 'student';
 
     if (!name || !email || password.length < 8) {
       return res.status(400).json({
@@ -32,14 +33,31 @@ router.post('/register', async (req, res) => {
       name,
       email,
       passwordHash: await bcrypt.hash(password, 12),
-      role: 'student',
+      role,
     });
 
+    let token = null;
+    if (process.env.JWT_SECRET) {
+      token = jwt.sign(
+        {
+          sub: user.id,
+          role: user.role,
+        },
+        process.env.JWT_SECRET,
+        {
+          expiresIn: '12h',
+        }
+      );
+    }
+
     return res.status(201).json({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     });
   } catch (error) {
     // Handles duplicate email registration, including concurrent requests.

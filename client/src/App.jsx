@@ -395,18 +395,28 @@ export default function App() {
 
     try {
       if (isRegister) {
+        const targetRole = loginPortal === 'instructor' ? 'instructor' : 'student';
         const data = await request('/auth/register', {
           method: 'POST',
-          body: JSON.stringify(auth),
+          body: JSON.stringify({
+            name: auth.name.trim(),
+            email: auth.email.trim(),
+            password: auth.password,
+            role: targetRole,
+          }),
         });
 
-        // Support APIs that return a token immediately
-        // after registration.
         if (data?.token && data?.user) {
           localStorage.setItem('learnlive_token', data.token);
 
           setUser(data.user);
-          setPage('Explore');
+          setPage(
+            data.user.role === 'student'
+              ? 'Explore'
+              : data.user.role === 'admin'
+              ? 'Admin Management'
+              : 'Dashboard'
+          );
 
           flash(`Welcome to LearnLive, ${data.user.name}!`);
         } else {
@@ -417,7 +427,11 @@ export default function App() {
             password: '',
           }));
 
-          flash('Account created successfully. Please sign in.');
+          flash(
+            targetRole === 'instructor'
+              ? 'Instructor account created successfully! Please sign in.'
+              : 'Student account created successfully! Please sign in.'
+          );
         }
       } else {
         const data = await request('/auth/login', {
@@ -1643,13 +1657,24 @@ export default function App() {
                 <small>Manage courses and learning</small></span>
                 <ArrowRight size={18} />
               </button>
-              <p className="switch-auth" style={{ 
-                marginTop: 22 }}>New to LearnLive? 
-                <button type="button" onClick={() => { 
-                  setLoginPortal('student'); 
-                  setIsRegister(true); 
-                  setPage('Sign in'); 
-                }}>Create student account</button></p>
+              <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <p className="switch-auth" style={{ margin: 0 }}>
+                  New student?{' '}
+                  <button type="button" onClick={() => { 
+                    setLoginPortal('student'); 
+                    setIsRegister(true); 
+                    setPage('Sign in'); 
+                  }}>Create student account</button>
+                </p>
+                <p className="switch-auth" style={{ margin: 0 }}>
+                  New instructor?{' '}
+                  <button type="button" onClick={() => { 
+                    setLoginPortal('instructor'); 
+                    setIsRegister(true); 
+                    setPage('Sign in'); 
+                  }}>Create instructor account</button>
+                </p>
+              </div>
               <button type="button" className="sign-in-link" style={{ 
                 marginTop: 8 
               }} onClick={() => setPage('Explore')}>Browse public courses <ArrowRight size={14} /></button>
@@ -1691,16 +1716,32 @@ export default function App() {
             </div>
 
             <form className="auth-card" onSubmit={submitAuth}>
-              <div className="eyebrow">{isRegister ? 'STUDENT REGISTRATION' : loginPortal === 'student' ? 'STUDENT PORTAL' : 'INSTRUCTOR / ADMIN PORTAL'}</div>
+              <div className="eyebrow">
+                {isRegister
+                  ? loginPortal === 'instructor'
+                    ? 'INSTRUCTOR REGISTRATION'
+                    : 'STUDENT REGISTRATION'
+                  : loginPortal === 'instructor'
+                  ? 'INSTRUCTOR / ADMIN PORTAL'
+                  : 'STUDENT PORTAL'}
+              </div>
 
               <h2>
-                {isRegister ? 'Create your account' : 'Welcome back'}
+                {isRegister
+                  ? loginPortal === 'instructor'
+                    ? 'Create instructor account'
+                    : 'Create your account'
+                  : 'Welcome back'}
               </h2>
 
               <p className="muted">
                 {isRegister
-                  ? 'Create your student account to get started.'
-                  : loginPortal === 'student' ? 'Sign in to continue your learning journey.' : 'Sign in to manage courses and classes.'}
+                  ? loginPortal === 'instructor'
+                    ? 'Register as an instructor to build courses and teach live classes.'
+                    : 'Create your student account to get started.'
+                  : loginPortal === 'student'
+                  ? 'Sign in to continue your learning journey.'
+                  : 'Sign in to manage courses and classes.'}
               </p>
 
               {isRegister && (
@@ -1768,20 +1809,26 @@ export default function App() {
                 {loading
                   ? 'Please wait...'
                   : isRegister
-                    ? 'Create account'
-                    : 'Sign in'}
+                  ? loginPortal === 'instructor'
+                    ? 'Create instructor account'
+                    : 'Create student account'
+                  : 'Sign in'}
 
                 <ArrowRight size={16} />
               </button>
 
-              {!isRegister && (
-                <p className="switch-auth"><button type="button" onClick={() => { setNotice(''); setPage('Welcome'); }}>← Back to portal selection</button></p>
-              )}
+              <p className="switch-auth" style={{ marginTop: 14 }}>
+                <button type="button" onClick={() => { setNotice(''); setPage('Welcome'); }}>
+                  ← Back to portal selection
+                </button>
+              </p>
 
               <p className="switch-auth">
                 {isRegister
                   ? 'Already have an account?'
-                  : "Don't have an account?"}
+                  : loginPortal === 'instructor'
+                  ? "Don't have an instructor account?"
+                  : "Don't have a student account?"}
 
                 <button
                   type="button"

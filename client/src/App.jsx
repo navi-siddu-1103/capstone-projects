@@ -3062,8 +3062,6 @@ export default function App() {
                         <span>
                           QUESTION {String(questionIndex + 1).padStart(2, '0')}
                         </span>
-
-                        <h4>Question {questionIndex + 1}</h4>
                       </div>
 
                       <div className="quiz-question-heading-actions">

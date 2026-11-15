@@ -6908,32 +6908,57 @@ button {
   display: inline-block;
 }
 
-.card-footer-buttons {
+.completed-card-actions {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 9px;
   width: 100%;
 }
 
-.card-footer-buttons > .btn-primary {
-  flex: 1;
+.completed-card-actions .btn {
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  box-sizing: border-box !important;
 }
 
-.certificate-dash-btn {
-  flex: 0 0 auto;
-  background: #fefce8 !important;
-  border: 1px solid #fef08a !important;
-  color: #a16207 !important;
+.completed-card-actions .certificate-download-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  font-weight: 700 !important;
+  font-size: 13.5px !important;
+  min-height: 44px !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.completed-card-actions .certificate-download-btn:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35) !important;
+}
+
+.completed-card-actions .review-course-btn {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
   font-weight: 600 !important;
-  display: inline-flex !important;
-  align-items: center;
-  gap: 5px;
-  padding: 0 14px !important;
+  font-size: 13px !important;
+  min-height: 38px !important;
+  border-radius: 10px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
 }
 
-.certificate-dash-btn:hover {
-  background: #fef9c3 !important;
-  color: #854d0e !important;
+.completed-card-actions .review-course-btn:hover {
+  background: #edf2f7 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
 }
 
 .status-completed {

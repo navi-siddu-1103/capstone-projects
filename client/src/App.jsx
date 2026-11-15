@@ -2347,14 +2347,21 @@ export default function App() {
                 {myCourses.map((course) => {
                   const lessons = course.lessons || [];
                   const completedLessons = course.completedLessons || [];
-                  const totalLessons = lessons.length;
-                  const completedCount = completedLessons.length;
+                  const totalLessons = course.totalLessons ?? lessons.length;
+                  const validCompletedCount = lessons.filter((l) =>
+                    completedLessons.map(String).includes(String(l._id))
+                  ).length;
+                  const completedCount = Math.min(
+                    totalLessons,
+                    course.completedCount ?? (validCompletedCount || completedLessons.length)
+                  );
                   const progress = totalLessons
                     ? Math.min(
                         100,
                         Math.round((completedCount / totalLessons) * 100)
                       )
                     : 0;
+                  const isCompleted = progress === 100;
 
                   return (
                     <article className="my-learning-card" key={course._id}>
@@ -2403,16 +2410,42 @@ export default function App() {
                       </div>
 
                       <div className="my-learning-card-footer">
-                        <button
-                          className="btn btn-primary"
-                          onClick={() => {
-                            setSelectedCourse(course);
-                            setPage('Course Details');
-                          }}
-                        >
-                          {progress === 100 ? 'Review course' : 'Continue learning'}
-                          <ArrowRight size={16} />
-                        </button>
+                        {isCompleted ? (
+                          <div className="completed-card-actions">
+                            <button
+                              type="button"
+                              className="btn btn-primary certificate-download-btn"
+                              onClick={() => downloadCertificate(course)}
+                              title="Download Official Certificate (PDF)"
+                            >
+                              <Award size={18} />
+                              Download Certificate
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn btn-secondary review-course-btn"
+                              onClick={() => {
+                                setSelectedCourse(course);
+                                setPage('Course Details');
+                              }}
+                            >
+                              Review Course
+                              <ArrowRight size={15} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="btn btn-primary"
+                            onClick={() => {
+                              setSelectedCourse(course);
+                              setPage('Course Details');
+                            }}
+                          >
+                            Continue learning
+                            <ArrowRight size={16} />
+                          </button>
+                        )}
                       </div>
                     </article>
                   );
@@ -5016,8 +5049,14 @@ export default function App() {
                         {displayedStudentCourses.map((course) => {
                           const lessons = course.lessons || [];
                           const completedLessons = course.completedLessons || [];
-                          const totalLessons = lessons.length;
-                          const completedCount = completedLessons.length;
+                          const totalLessons = course.totalLessons ?? lessons.length;
+                          const validCompletedCount = lessons.filter((l) =>
+                            completedLessons.map(String).includes(String(l._id))
+                          ).length;
+                          const completedCount = Math.min(
+                            totalLessons,
+                            course.completedCount ?? (validCompletedCount || completedLessons.length)
+                          );
                           const progress = totalLessons
                             ? Math.min(
                                 100,
@@ -5096,7 +5135,31 @@ export default function App() {
                               </div>
 
                               <div className="my-learning-card-footer">
-                                <div className="card-footer-buttons">
+                                {isCompleted ? (
+                                  <div className="completed-card-actions">
+                                    <button
+                                      type="button"
+                                      className="btn btn-primary certificate-download-btn"
+                                      onClick={() => downloadCertificate(course)}
+                                      title="Download Official Certificate (PDF)"
+                                    >
+                                      <Award size={18} />
+                                      Download Certificate
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary review-course-btn"
+                                      onClick={() => {
+                                        setSelectedCourse(course);
+                                        setPage('Course Details');
+                                      }}
+                                    >
+                                      Review Course
+                                      <ArrowRight size={15} />
+                                    </button>
+                                  </div>
+                                ) : (
                                   <button
                                     type="button"
                                     className="btn btn-primary"
@@ -5105,24 +5168,10 @@ export default function App() {
                                       setPage('Course Details');
                                     }}
                                   >
-                                    {isCompleted
-                                      ? 'Review Course'
-                                      : 'Continue Learning'}
+                                    Continue Learning
                                     <ArrowRight size={16} />
                                   </button>
-
-                                  {isCompleted && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-secondary certificate-dash-btn"
-                                      onClick={() => downloadCertificate(course)}
-                                      title="Download Official Certificate (PDF)"
-                                    >
-                                      <Award size={15} />
-                                      Certificate
-                                    </button>
-                                  )}
-                                </div>
+                                )}
                               </div>
                             </article>
                           );

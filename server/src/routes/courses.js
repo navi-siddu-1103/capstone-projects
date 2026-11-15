@@ -104,6 +104,7 @@ router.post('/', requireAuth, allowRoles('instructor', 'admin'), async (req, res
   message: 'Title and description are required' 
   });
   const course = await Course.create({ title, description, category, price, lessons: Array.isArray(lessons) ? lessons : [], instructor: req.user.id });
+  await course.populate('instructor', 'name');
   res.status(201).json(course);
 });
 

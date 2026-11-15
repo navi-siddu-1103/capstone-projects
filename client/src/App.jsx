@@ -503,13 +503,20 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify(form),
       });
-      const course = data?.course || data;
+      const rawCourse = data?.course || data;
 
-      if (!course?._id) {
+      if (!rawCourse?._id) {
         throw new Error(
           'The server did not return a valid course. Check the API response.'
         );
       }
+
+      const course = {
+        ...rawCourse,
+        instructor: rawCourse.instructor?.name
+          ? rawCourse.instructor
+          : { _id: user.id || user._id, name: user.name },
+      };
 
       setCourses((previous) => [course, ...previous]);
       setModal(false);

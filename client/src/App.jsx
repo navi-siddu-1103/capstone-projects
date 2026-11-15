@@ -404,7 +404,7 @@ export default function App() {
     try {
       if (isRegister) {
         const targetRole = loginPortal === 'instructor' ? 'instructor' : 'student';
-        const data = await request('/auth/register', {
+        await request('/auth/register', {
           method: 'POST',
           body: JSON.stringify({
             name: auth.name.trim(),
@@ -414,33 +414,19 @@ export default function App() {
           }),
         });
 
-        if (data?.token && data?.user) {
-          localStorage.setItem('learnlive_token', data.token);
+        setIsRegister(false);
+        setPage('Sign in');
 
-          setUser(data.user);
-          setPage(
-            data.user.role === 'student'
-              ? 'Explore'
-              : data.user.role === 'admin'
-              ? 'Admin Management'
-              : 'Dashboard'
-          );
+        setAuth((previous) => ({
+          ...previous,
+          password: '',
+        }));
 
-          flash(`Welcome to LearnLive, ${data.user.name}!`);
-        } else {
-          setIsRegister(false);
-
-          setAuth((previous) => ({
-            ...previous,
-            password: '',
-          }));
-
-          flash(
-            targetRole === 'instructor'
-              ? 'Instructor account created successfully! Please sign in.'
-              : 'Student account created successfully! Please sign in.'
-          );
-        }
+        flash(
+          targetRole === 'instructor'
+            ? 'Instructor account created successfully! Please sign in with your credentials.'
+            : 'Student account created successfully! Please sign in with your credentials.'
+        );
       } else {
         const data = await request('/auth/login', {
           method: 'POST',
@@ -1498,7 +1484,7 @@ export default function App() {
 
                   <button
                     type="button"
-                    className="btn btn-outline btn-sm"
+                    className="btn btn-outline btn-sm logout-btn"
                     onClick={logout}
                   >
                     <LogOut size={16} />

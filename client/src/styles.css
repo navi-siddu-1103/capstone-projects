@@ -6391,3 +6391,25 @@ button {
   color: #3b3dbb;
   transform: translateY(-1px);
 }
+
+/* Logout button light red hover effect across all dashboards */
+.logout-btn,
+.header-user .btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.logout-btn:hover,
+.header-user .btn-outline:hover {
+  background: #fff1f0 !important;
+  border-color: #ffa39e !important;
+  color: #cf1322 !important;
+}
+
+.logout-btn:hover svg,
+.header-user .btn-outline:hover svg {
+  stroke: #cf1322 !important;
+}

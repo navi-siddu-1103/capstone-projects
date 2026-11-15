@@ -21,8 +21,6 @@ import {
   X,
 } from 'lucide-react';
 
-import { useDispatch, useSelector } from "react-redux";
-import { login } from "./store/authSlice";
 
 import Hls from 'hls.js';
 
@@ -263,8 +261,6 @@ export default function App() {
     },
   ]);
 
-  const dispatch = useDispatch();
-  const { status, error } = useSelector((s) => s.auth);
 
   const [quizSaving, setQuizSaving] = useState(false);
   const [auth, setAuth] = useState({
@@ -411,12 +407,6 @@ export default function App() {
     }
   };
 
-  async function onSubmit(e) {
-    e.preventDefault();
-    const result = await dispatch(login({ email, password }));
-    if (login.fulfilled.match(result)) navigate("/dashboard");
-  }
-  
   // LOGIN AND REGISTRATION
   async function submitAuth(event) {
     event.preventDefault();

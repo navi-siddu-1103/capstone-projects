@@ -2,8 +2,6 @@
 
 A Notion/Figma-style workspace where several people edit the same document at once, see each other's cursors, and never lose changes. Built for the FS-02 internship project.
 
-Demo video: _add link here_
-
 ## Features
 
 - **Live co-editing** with a rich-text editor (TipTap) on top of Yjs, a CRDT, so concurrent edits merge without conflicts

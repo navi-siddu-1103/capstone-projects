@@ -1,0 +1,36 @@
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+!.env.example.*
+
+# Dependencies
+node_modules/
+
+# Build output
+client/dist/
+server/dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# LearnLive video processing files
+server/processed/
+server/uploads/
+server/test-videos/
+
+# Temporary video files
+*.m3u8
+*.ts
+
+# Documents & Temp PDFs
+server/*.pdf
+*.pdf
+!client/public/**
